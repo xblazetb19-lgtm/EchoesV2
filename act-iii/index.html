@@ -119,12 +119,37 @@
             <p class="album-hero-label">ALBUM</p>
             <h2 class="album-hero-name" id="albumHeroName"></h2>
             <p class="album-hero-count" id="albumHeroCount"></p>
+            <div class="album-hero-actions">
+              <button class="album-action-btn" id="btnImportToAlbum">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Importer des musiques
+              </button>
+              <button class="album-action-btn secondary" id="btnAddExistingToAlbum">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                Ajouter existante
+              </button>
+            </div>
           </div>
         </div>
+
+        <!-- Import progress panel (hidden by default) -->
+        <div class="import-panel" id="importPanel" hidden>
+          <div class="import-panel-header">
+            <span class="import-panel-title" id="importPanelTitle">Importation en cours…</span>
+            <span class="import-panel-count" id="importPanelCount"></span>
+          </div>
+          <div class="import-global-bar">
+            <div class="import-global-fill" id="importGlobalFill"></div>
+          </div>
+          <p class="import-global-pct" id="importGlobalPct">0%</p>
+          <div class="import-file-list" id="importFileList"></div>
+        </div>
+
         <ul class="song-list" id="albumSongList" role="list"></ul>
         <div class="empty-state" id="albumEmptyState" hidden>
           <div class="empty-icon">♩</div>
           <p class="empty-title">Aucune musique dans cet album</p>
+          <p class="empty-sub">Importez des MP3 ou ajoutez une musique existante.</p>
         </div>
       </div>
 
@@ -379,6 +404,30 @@
       <button class="player-btn" id="nextBtn" aria-label="Suivant">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-6 5.5 4V8L8 12zm7-6h2v12h-2z"/></svg>
       </button>
+    </div>
+  </div>
+
+  <!-- Hidden bulk MP3 input (for album import) -->
+  <input type="file" id="bulkMp3Input" accept=".mp3,audio/mpeg" multiple style="display:none" />
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- MODAL ADD EXISTING SONGS TO ALBUM          -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalAddExisting" role="dialog" aria-modal="true" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Ajouter à l'album</h2>
+        <button class="modal-close" id="modalAddExistingClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="atp-song-name" id="addExistingAlbumName"></p>
+        <div class="search-inner" style="margin-bottom:12px">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="existingSongSearch" class="search-input" placeholder="Filtrer les musiques…" autocomplete="off" />
+        </div>
+        <div class="playlist-pick-list" id="existingSongList" style="max-height:320px;overflow-y:auto"></div>
+        <p class="empty-sub" id="existingSongEmpty" hidden>Aucune musique sans album disponible.</p>
+      </div>
     </div>
   </div>
 
