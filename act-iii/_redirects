@@ -1,0 +1,8 @@
+/* ── Redirige toutes les routes vers index.html (SPA) ── */
+/*    Compatible Netlify et Render static sites             */
+
+/* Render */
+/ /index.html 200
+
+/* Fallback pour Netlify si besoin */
+/* /*  /index.html  200 */
