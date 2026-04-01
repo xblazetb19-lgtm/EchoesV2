@@ -40,9 +40,29 @@
   </header>
 
   <!-- ══════════════════════════════════════════ -->
-  <!-- SEARCH BAR                                 -->
+  <!-- TAB NAVIGATION                             -->
   <!-- ══════════════════════════════════════════ -->
-  <div class="search-wrapper">
+  <nav class="tab-nav">
+    <div class="tab-nav-inner">
+      <button class="tab-btn active" data-tab="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Accueil
+      </button>
+      <button class="tab-btn" data-tab="albums">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        Albums
+      </button>
+      <button class="tab-btn" data-tab="playlists">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Playlists
+      </button>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SEARCH BAR (home tab only)                 -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="search-wrapper" id="searchWrapper">
     <div class="search-inner">
       <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -64,114 +84,306 @@
   <!-- ══════════════════════════════════════════ -->
   <main class="main-content">
 
-    <!-- Tabs / Sort info -->
-    <div class="list-header">
-      <span class="list-count" id="songCount">— titres</span>
-      <span class="list-sort">↓ Plus récents</span>
-    </div>
+    <!-- ── TAB: HOME ── -->
+    <section class="tab-section active" id="tab-home">
+      <div class="list-header">
+        <span class="list-count" id="songCount">— titres</span>
+        <span class="list-sort">↓ Plus récents</span>
+      </div>
+      <ul class="song-list" id="songList" role="list"></ul>
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="empty-icon">♩</div>
+        <p class="empty-title">Aucune musique pour le moment</p>
+        <p class="empty-sub">Soyez le premier à en ajouter une !</p>
+      </div>
+      <div class="no-results" id="noResults" hidden>
+        <div class="empty-icon">⌕</div>
+        <p class="empty-title">Aucun résultat</p>
+        <p class="empty-sub">Essayez un autre titre ou artiste.</p>
+      </div>
+    </section>
 
-    <!-- Song list -->
-    <ul class="song-list" id="songList" role="list">
-      <!-- Songs rendered by JS -->
-    </ul>
+    <!-- ── TAB: ALBUMS ── -->
+    <section class="tab-section" id="tab-albums">
+      <!-- Album detail view (hidden by default) -->
+      <div id="albumDetailView" hidden>
+        <div class="back-bar">
+          <button class="back-btn" id="backFromAlbum">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Albums
+          </button>
+        </div>
+        <div class="album-hero" id="albumHero">
+          <img class="album-hero-img" id="albumHeroImg" src="" alt="" />
+          <div class="album-hero-info">
+            <p class="album-hero-label">ALBUM</p>
+            <h2 class="album-hero-name" id="albumHeroName"></h2>
+            <p class="album-hero-count" id="albumHeroCount"></p>
+          </div>
+        </div>
+        <ul class="song-list" id="albumSongList" role="list"></ul>
+        <div class="empty-state" id="albumEmptyState" hidden>
+          <div class="empty-icon">♩</div>
+          <p class="empty-title">Aucune musique dans cet album</p>
+        </div>
+      </div>
 
-    <!-- Empty state -->
-    <div class="empty-state" id="emptyState" hidden>
-      <div class="empty-icon">♩</div>
-      <p class="empty-title">Aucune musique pour le moment</p>
-      <p class="empty-sub">Soyez le premier à en ajouter une !</p>
-    </div>
+      <!-- Albums grid -->
+      <div id="albumsGridView">
+        <div class="list-header">
+          <span class="list-count" id="albumCount">— albums</span>
+        </div>
+        <div class="album-grid" id="albumGrid"></div>
+        <div class="empty-state" id="albumsEmpty" hidden>
+          <div class="empty-icon">◉</div>
+          <p class="empty-title">Aucun album pour le moment</p>
+          <p class="empty-sub">Créez votre premier album !</p>
+        </div>
+      </div>
+    </section>
 
-    <!-- No results state -->
-    <div class="no-results" id="noResults" hidden>
-      <div class="empty-icon">⌕</div>
-      <p class="empty-title">Aucun résultat</p>
-      <p class="empty-sub">Essayez un autre titre ou artiste.</p>
-    </div>
+    <!-- ── TAB: PLAYLISTS ── -->
+    <section class="tab-section" id="tab-playlists">
+      <!-- Playlist detail view -->
+      <div id="playlistDetailView" hidden>
+        <div class="back-bar">
+          <button class="back-btn" id="backFromPlaylist">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Playlists
+          </button>
+        </div>
+        <div class="playlist-hero" id="playlistHero">
+          <div class="playlist-hero-icon">♫</div>
+          <div class="playlist-hero-info">
+            <p class="album-hero-label">PLAYLIST</p>
+            <h2 class="album-hero-name" id="playlistHeroName"></h2>
+            <p class="album-hero-count" id="playlistHeroCount"></p>
+          </div>
+        </div>
+        <ul class="song-list" id="playlistSongList" role="list"></ul>
+        <div class="empty-state" id="playlistEmptyState" hidden>
+          <div class="empty-icon">♩</div>
+          <p class="empty-title">Cette playlist est vide</p>
+        </div>
+      </div>
+
+      <!-- Playlists list -->
+      <div id="playlistsListView">
+        <div class="list-header">
+          <span class="list-count" id="playlistCount">— playlists</span>
+        </div>
+        <div class="playlist-list" id="playlistList"></div>
+        <div class="empty-state" id="playlistsEmpty" hidden>
+          <div class="empty-icon">≡</div>
+          <p class="empty-title">Aucune playlist pour le moment</p>
+          <p class="empty-sub">Créez votre première playlist !</p>
+        </div>
+      </div>
+    </section>
 
   </main>
 
   <!-- ══════════════════════════════════════════ -->
-  <!-- FLOATING ADD BUTTON                        -->
+  <!-- FLOATING ADD BUTTON (FAB)                  -->
   <!-- ══════════════════════════════════════════ -->
-  <button class="fab" id="fabBtn" aria-label="Ajouter une musique">
+  <button class="fab" id="fabBtn" aria-label="Ajouter">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
       <path d="M12 5v14M5 12h14"/>
     </svg>
   </button>
 
+  <!-- FAB Menu -->
+  <div class="fab-menu" id="fabMenu" hidden>
+    <button class="fab-menu-item" id="fabAddSong">
+      <span class="fab-menu-icon">♪</span>
+      Ajouter une musique
+    </button>
+    <button class="fab-menu-item" id="fabAddAlbum">
+      <span class="fab-menu-icon">◉</span>
+      Créer un album
+    </button>
+    <button class="fab-menu-item" id="fabAddPlaylist">
+      <span class="fab-menu-icon">≡</span>
+      Créer une playlist
+    </button>
+  </div>
+
   <!-- ══════════════════════════════════════════ -->
   <!-- MODAL ADD SONG                             -->
   <!-- ══════════════════════════════════════════ -->
-  <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-label="Ajouter une musique" hidden>
+  <div class="modal-overlay" id="modalSong" role="dialog" aria-modal="true" aria-label="Ajouter une musique" hidden>
     <div class="modal-card">
       <div class="modal-header">
         <h2 class="modal-title">Nouvelle musique</h2>
-        <button class="modal-close" id="modalClose" aria-label="Fermer">✕</button>
+        <button class="modal-close" id="modalSongClose" aria-label="Fermer">✕</button>
       </div>
-
       <div class="modal-body">
         <div class="field-group">
           <label class="field-label" for="inputTitle">Titre *</label>
-          <input
-            type="text"
-            id="inputTitle"
-            class="field-input"
-            placeholder="Ex : Giorno's Theme"
-            autocomplete="off"
-            maxlength="100"
-          />
+          <input type="text" id="inputTitle" class="field-input" placeholder="Ex : Giorno's Theme" autocomplete="off" maxlength="100" />
         </div>
-
         <div class="field-group">
           <label class="field-label" for="inputArtist">Artiste *</label>
-          <input
-            type="text"
-            id="inputArtist"
-            class="field-input"
-            placeholder="Ex : Yugo Kanno"
-            autocomplete="off"
-            maxlength="100"
-          />
+          <input type="text" id="inputArtist" class="field-input" placeholder="Ex : Yugo Kanno" autocomplete="off" maxlength="100" />
         </div>
-
-        <p class="field-error" id="formError" hidden></p>
+        <div class="field-group">
+          <label class="field-label" for="inputMp3">Fichier MP3 *</label>
+          <div class="file-input-wrapper" id="mp3Wrapper">
+            <input type="file" id="inputMp3" accept=".mp3,audio/mpeg" />
+            <div class="file-input-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span id="mp3Label">Choisir un fichier MP3</span>
+            </div>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="inputCover">Cover (optionnelle)</label>
+          <div class="file-input-wrapper" id="coverWrapper">
+            <input type="file" id="inputCover" accept="image/*" />
+            <div class="file-input-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span id="coverLabel">Choisir une image</span>
+            </div>
+          </div>
+          <img id="coverPreview" class="cover-preview" hidden />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="inputAlbum">Album (optionnel)</label>
+          <select id="inputAlbum" class="field-input field-select">
+            <option value="">— Aucun album —</option>
+          </select>
+        </div>
+        <p class="field-error" id="formSongError" hidden></p>
       </div>
-
       <div class="modal-footer">
-        <button class="btn-cancel" id="btnCancel">Annuler</button>
-        <button class="btn-submit" id="btnSubmit">
-          <span id="btnSubmitLabel">Ajouter</span>
-          <span class="btn-loader" id="btnLoader" hidden></span>
+        <button class="btn-cancel" id="btnSongCancel">Annuler</button>
+        <button class="btn-submit" id="btnSongSubmit">
+          <span id="btnSongLabel">Ajouter</span>
+          <span class="btn-loader" id="btnSongLoader" hidden></span>
         </button>
       </div>
     </div>
   </div>
 
   <!-- ══════════════════════════════════════════ -->
-  <!-- MINI PLAYER                                -->
+  <!-- MODAL CREATE ALBUM                         -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalAlbum" role="dialog" aria-modal="true" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Nouvel album</h2>
+        <button class="modal-close" id="modalAlbumClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <label class="field-label" for="inputAlbumName">Nom de l'album *</label>
+          <input type="text" id="inputAlbumName" class="field-input" placeholder="Ex : Discovery" autocomplete="off" maxlength="100" />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="inputAlbumCover">Cover *</label>
+          <div class="file-input-wrapper" id="albumCoverWrapper">
+            <input type="file" id="inputAlbumCover" accept="image/*" />
+            <div class="file-input-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span id="albumCoverLabel">Choisir une image</span>
+            </div>
+          </div>
+          <img id="albumCoverPreview" class="cover-preview" hidden />
+        </div>
+        <p class="field-error" id="formAlbumError" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="btnAlbumCancel">Annuler</button>
+        <button class="btn-submit" id="btnAlbumSubmit">
+          <span id="btnAlbumLabel">Créer</span>
+          <span class="btn-loader" id="btnAlbumLoader" hidden></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- MODAL CREATE PLAYLIST                      -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalPlaylist" role="dialog" aria-modal="true" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Nouvelle playlist</h2>
+        <button class="modal-close" id="modalPlaylistClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <label class="field-label" for="inputPlaylistName">Nom *</label>
+          <input type="text" id="inputPlaylistName" class="field-input" placeholder="Ex : Chill Vibes" autocomplete="off" maxlength="100" />
+        </div>
+        <p class="field-error" id="formPlaylistError" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="btnPlaylistCancel">Annuler</button>
+        <button class="btn-submit" id="btnPlaylistSubmit">
+          <span id="btnPlaylistLabel">Créer</span>
+          <span class="btn-loader" id="btnPlaylistLoader" hidden></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- MODAL ADD TO PLAYLIST                      -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalAddToPlaylist" role="dialog" aria-modal="true" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Ajouter à…</h2>
+        <button class="modal-close" id="modalATPClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="atp-song-name" id="atpSongName"></p>
+        <div class="playlist-pick-list" id="playlistPickList"></div>
+        <p class="empty-sub" id="atpEmpty" hidden>Aucune playlist. Créez-en une d'abord.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- PLAYER                                     -->
   <!-- ══════════════════════════════════════════ -->
   <div class="player" id="player">
+    <div class="player-cover" id="playerCover">
+      <img id="playerCoverImg" src="" alt="" hidden />
+      <span class="player-disc-inner" id="playerDiscInner">◆</span>
+    </div>
     <div class="player-info">
-      <div class="player-disc" id="playerDisc">
-        <span class="player-disc-inner">◆</span>
-      </div>
       <div class="player-text">
         <p class="player-title" id="playerTitle">Aucune piste sélectionnée</p>
         <p class="player-artist" id="playerArtist">—</p>
       </div>
+      <div class="player-progress-wrap">
+        <div class="player-progress-bar" id="progressBar">
+          <div class="player-progress-fill" id="progressFill"></div>
+        </div>
+        <div class="player-times">
+          <span id="currentTime">0:00</span>
+          <span id="totalTime">0:00</span>
+        </div>
+      </div>
     </div>
     <div class="player-controls">
+      <button class="player-btn" id="prevBtn" aria-label="Précédent">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+      </button>
       <button class="player-btn play-btn" id="playBtn" aria-label="Play / Pause">
-        <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="5,3 19,12 5,21"/>
-        </svg>
-        <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-          <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-        </svg>
+        <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <button class="player-btn" id="nextBtn" aria-label="Suivant">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-6 5.5 4V8L8 12zm7-6h2v12h-2z"/></svg>
       </button>
     </div>
   </div>
+
+  <!-- Hidden audio element -->
+  <audio id="audioEl" preload="metadata"></audio>
 
   <!-- Toast notification -->
   <div class="toast" id="toast" hidden></div>
