@@ -65,17 +65,36 @@ const searchInput     = document.getElementById('searchInput');
 const searchClear     = document.getElementById('searchClear');
 
 // Albums
-const albumGrid       = document.getElementById('albumGrid');
-const albumCount      = document.getElementById('albumCount');
-const albumsEmpty     = document.getElementById('albumsEmpty');
-const albumsGridView  = document.getElementById('albumsGridView');
-const albumDetailView = document.getElementById('albumDetailView');
-const albumHeroImg    = document.getElementById('albumHeroImg');
-const albumHeroName   = document.getElementById('albumHeroName');
-const albumHeroCount  = document.getElementById('albumHeroCount');
-const albumSongList   = document.getElementById('albumSongList');
-const albumEmptyState = document.getElementById('albumEmptyState');
-const backFromAlbum   = document.getElementById('backFromAlbum');
+const albumGrid           = document.getElementById('albumGrid');
+const albumCount          = document.getElementById('albumCount');
+const albumsEmpty         = document.getElementById('albumsEmpty');
+const albumsGridView      = document.getElementById('albumsGridView');
+const albumDetailView     = document.getElementById('albumDetailView');
+const albumHeroImg        = document.getElementById('albumHeroImg');
+const albumHeroName       = document.getElementById('albumHeroName');
+const albumHeroCount      = document.getElementById('albumHeroCount');
+const albumSongList       = document.getElementById('albumSongList');
+const albumEmptyState     = document.getElementById('albumEmptyState');
+const backFromAlbum       = document.getElementById('backFromAlbum');
+const btnImportToAlbum    = document.getElementById('btnImportToAlbum');
+const btnAddExistingToAlbum = document.getElementById('btnAddExistingToAlbum');
+const bulkMp3Input        = document.getElementById('bulkMp3Input');
+
+// Import progress panel
+const importPanel      = document.getElementById('importPanel');
+const importPanelTitle = document.getElementById('importPanelTitle');
+const importPanelCount = document.getElementById('importPanelCount');
+const importGlobalFill = document.getElementById('importGlobalFill');
+const importGlobalPct  = document.getElementById('importGlobalPct');
+const importFileList   = document.getElementById('importFileList');
+
+// Modal Add Existing To Album
+const modalAddExisting      = document.getElementById('modalAddExisting');
+const modalAddExistingClose = document.getElementById('modalAddExistingClose');
+const addExistingAlbumName  = document.getElementById('addExistingAlbumName');
+const existingSongSearch    = document.getElementById('existingSongSearch');
+const existingSongList      = document.getElementById('existingSongList');
+const existingSongEmpty     = document.getElementById('existingSongEmpty');
 
 // Playlists
 const playlistList      = document.getElementById('playlistList');
@@ -350,14 +369,19 @@ async function openAlbumDetail(album) {
 
   albumsGridView.hidden  = true;
   albumDetailView.hidden = false;
+  importPanel.hidden     = true;
 
-  // Load songs for this album
+  await refreshAlbumSongs();
+}
+
+/* Recharge la liste de musiques de l'album courant */
+async function refreshAlbumSongs() {
   showSkeletons(albumSongList, 3);
   try {
     const { data, error } = await db
       .from('songs')
       .select('*, albums(id, name, cover_url)')
-      .eq('album_id', album.id)
+      .eq('album_id', currentAlbumId)
       .order('created_at', { ascending: false });
     if (error) throw error;
 
@@ -374,7 +398,243 @@ async function openAlbumDetail(album) {
       renderSongs(songs, albumSongList);
     }
   } catch (err) {
-    console.error('[Act-III] openAlbumDetail error:', err);
+    console.error('[Act-III] refreshAlbumSongs error:', err);
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   📥  IMPORT BULK MP3 → ALBUM
+   ═══════════════════════════════════════════════════ */
+async function importMp3sToAlbum(files) {
+  if (!files || files.length === 0) return;
+  if (!currentAlbumId) return;
+
+  const total = files.length;
+  let done = 0;
+
+  // Show import panel
+  importPanel.hidden = false;
+  importPanelTitle.textContent = `Importation en cours…`;
+  importPanelCount.textContent = `0 / ${total}`;
+  importGlobalFill.style.width = '0%';
+  importGlobalPct.textContent  = '0%';
+  importFileList.innerHTML = '';
+
+  // Get album info for cover fallback
+  const album = allAlbums.find(a => a.id === currentAlbumId);
+
+  // Create a row per file
+  const fileRows = [];
+  Array.from(files).forEach((file, i) => {
+    const row = document.createElement('div');
+    row.classList.add('import-file-row');
+    const nameClean = file.name.replace(/\.mp3$/i, '');
+    row.innerHTML = `
+      <div class="import-file-info">
+        <span class="import-file-name">${escapeHtml(nameClean)}</span>
+        <span class="import-file-status" id="importStatus_${i}">En attente…</span>
+      </div>
+      <div class="import-file-bar">
+        <div class="import-file-fill" id="importFill_${i}" style="width:0%"></div>
+      </div>
+    `;
+    importFileList.appendChild(row);
+    fileRows.push({ file, nameClean, index: i });
+  });
+
+  // Process sequentially
+  for (const { file, nameClean, index } of fileRows) {
+    const statusEl = document.getElementById(`importStatus_${index}`);
+    const fillEl   = document.getElementById(`importFill_${index}`);
+
+    statusEl.textContent = 'Upload…';
+    fillEl.style.width   = '5%';
+
+    try {
+      // Upload MP3
+      const mp3Path = `${Date.now()}-${index}-${sanitizeFilename(file.name)}`;
+
+      // XHR pour vraie progression
+      const audioUrl = await uploadWithProgress(
+        `${SUPABASE_URL}/storage/v1/object/songs/${mp3Path}`,
+        file,
+        'audio/mpeg',
+        (pct) => {
+          fillEl.style.width = `${pct}%`;
+          statusEl.textContent = `Upload ${pct}%`;
+        }
+      );
+
+      fillEl.style.width = '90%';
+      statusEl.textContent = 'Enregistrement…';
+
+      // Parse title / artist depuis le nom du fichier (format "Artiste - Titre" ou juste "Titre")
+      let title  = nameClean;
+      let artist = 'Inconnu';
+      const sep = nameClean.indexOf(' - ');
+      if (sep > 0) {
+        artist = nameClean.slice(0, sep).trim();
+        title  = nameClean.slice(sep + 3).trim();
+      }
+
+      // Insert into DB
+      const { data: songData, error: dbErr } = await db
+        .from('songs')
+        .insert([{
+          title,
+          artist,
+          audio_url: audioUrl,
+          cover_url: null,       // utilisera la cover de l'album
+          album_id:  currentAlbumId
+        }])
+        .select('*, albums(id, name, cover_url)')
+        .single();
+
+      if (dbErr) throw dbErr;
+
+      fillEl.style.width = '100%';
+      fillEl.style.background = 'var(--accent)';
+      statusEl.textContent = '✓ OK';
+      statusEl.style.color = 'var(--accent)';
+
+      // Add to local allSongs
+      if (!allSongs.find(s => s.id === songData.id)) {
+        allSongs.unshift(songData);
+      }
+
+    } catch (err) {
+      console.error(`[Act-III] import error for ${file.name}:`, err);
+      fillEl.style.background = 'var(--danger)';
+      statusEl.textContent = '✗ Erreur';
+      statusEl.style.color = 'var(--danger)';
+    }
+
+    done++;
+    const globalPct = Math.round((done / total) * 100);
+    importGlobalFill.style.width = `${globalPct}%`;
+    importGlobalPct.textContent  = `${globalPct}%`;
+    importPanelCount.textContent = `${done} / ${total}`;
+  }
+
+  // Finished
+  importPanelTitle.textContent = done === total ? 'Importation terminée ✓' : `Importation partielle (${done}/${total})`;
+  importGlobalFill.style.background = 'var(--accent)';
+
+  // Refresh list & home
+  filteredSongs = applySearch(allSongs, searchInput.value);
+  renderSongs(filteredSongs, songList, { showEmpty: true, useHome: true });
+  updateCount(songCount, allSongs.length, 'titre');
+  await refreshAlbumSongs();
+
+  // Auto-hide panel after 3s
+  setTimeout(() => { importPanel.hidden = true; }, 3500);
+}
+
+/* Upload fichier via XHR pour avoir la progression réelle */
+function uploadWithProgress(url, file, mimeType, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON}`);
+    xhr.setRequestHeader('Content-Type', mimeType);
+    xhr.setRequestHeader('x-upsert', 'false');
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        onProgress(Math.min(pct, 95)); // reserve 5% for DB insert
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        // Build public URL
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/songs/${url.split('/songs/')[1]}`;
+        resolve(publicUrl);
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+    xhr.send(file);
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   ➕  ADD EXISTING SONGS TO ALBUM
+   ═══════════════════════════════════════════════════ */
+function openAddExistingModal() {
+  if (!currentAlbumId) return;
+  const album = allAlbums.find(a => a.id === currentAlbumId);
+  addExistingAlbumName.textContent = album ? `Album : "${album.name}"` : '';
+  existingSongSearch.value = '';
+
+  renderExistingSongsList('');
+  modalAddExisting.hidden = false;
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => existingSongSearch.focus(), 300);
+}
+
+function renderExistingSongsList(query) {
+  existingSongList.innerHTML = '';
+  // Songs not yet in this album
+  let candidates = allSongs.filter(s => s.album_id !== currentAlbumId);
+  if (query) {
+    const q = query.toLowerCase();
+    candidates = candidates.filter(s =>
+      s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q)
+    );
+  }
+
+  existingSongEmpty.hidden = candidates.length > 0;
+
+  candidates.forEach(song => {
+    const btn = document.createElement('button');
+    btn.classList.add('playlist-pick-btn');
+    const coverUrl = getCoverUrl(song);
+    btn.innerHTML = `
+      ${coverUrl
+        ? `<img src="${escapeHtml(coverUrl)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0" />`
+        : `<span class="playlist-item-icon" style="width:36px;height:36px;font-size:14px">♪</span>`
+      }
+      <span style="flex:1;min-width:0;text-align:left">
+        <span style="display:block;font-size:14px;font-weight:500">${escapeHtml(song.title)}</span>
+        <span style="display:block;font-size:12px;color:var(--text-2)">${escapeHtml(song.artist)}</span>
+      </span>
+    `;
+    btn.addEventListener('click', () => assignSongToAlbum(song));
+    existingSongList.appendChild(btn);
+  });
+}
+
+async function assignSongToAlbum(song) {
+  try {
+    const { error } = await db
+      .from('songs')
+      .update({ album_id: currentAlbumId })
+      .eq('id', song.id);
+    if (error) throw error;
+
+    // Update local state
+    const local = allSongs.find(s => s.id === song.id);
+    if (local) {
+      local.album_id = currentAlbumId;
+      const album = allAlbums.find(a => a.id === currentAlbumId);
+      local.albums = album || null;
+    }
+
+    showToast(`"${song.title}" ajouté à l'album !`);
+    modalAddExisting.hidden = true;
+    document.body.style.overflow = '';
+
+    // Refresh views
+    filteredSongs = applySearch(allSongs, searchInput.value);
+    renderSongs(filteredSongs, songList, { showEmpty: true, useHome: true });
+    await refreshAlbumSongs();
+  } catch (err) {
+    console.error('[Act-III] assignSongToAlbum error:', err);
+    showToast('Erreur lors de l\'assignation');
   }
 }
 
@@ -1135,10 +1395,40 @@ function bindEvents() {
   modalATPClose.addEventListener('click', closeModalATP);
   modalATP.addEventListener('click', (e) => { if (e.target === modalATP) closeModalATP(); });
 
+  /* ── ALBUM DETAIL ACTIONS ── */
+  btnImportToAlbum.addEventListener('click', () => {
+    bulkMp3Input.value = ''; // reset so same files can be re-selected
+    bulkMp3Input.click();
+  });
+
+  bulkMp3Input.addEventListener('change', () => {
+    if (bulkMp3Input.files.length > 0) {
+      importMp3sToAlbum(bulkMp3Input.files);
+    }
+  });
+
+  btnAddExistingToAlbum.addEventListener('click', openAddExistingModal);
+
+  /* ── MODAL ADD EXISTING ── */
+  modalAddExistingClose.addEventListener('click', () => {
+    modalAddExisting.hidden = true;
+    document.body.style.overflow = '';
+  });
+  modalAddExisting.addEventListener('click', (e) => {
+    if (e.target === modalAddExisting) {
+      modalAddExisting.hidden = true;
+      document.body.style.overflow = '';
+    }
+  });
+  existingSongSearch.addEventListener('input', () => {
+    renderExistingSongsList(existingSongSearch.value.trim());
+  });
+
   /* ── BACK BUTTONS ── */
   backFromAlbum.addEventListener('click', () => {
     albumDetailView.hidden = true;
     albumsGridView.hidden  = false;
+    importPanel.hidden     = true;
     currentAlbumId = null;
   });
   backFromPlaylist.addEventListener('click', () => {
@@ -1159,6 +1449,7 @@ function bindEvents() {
     else if (!modalAlbum.hidden) closeAlbumModal();
     else if (!modalPlaylist.hidden) closePlaylistModal();
     else if (!modalATP.hidden) closeModalATP();
+    else if (!modalAddExisting.hidden) { modalAddExisting.hidden = true; document.body.style.overflow = ''; }
     else if (!fabMenu.hidden) closeFabMenu();
   });
 }
