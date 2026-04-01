@@ -1108,6 +1108,162 @@ body {
 }
 
 /* ══════════════════════════════════════════════════
+   ALBUM HERO ACTIONS
+   ══════════════════════════════════════════════════ */
+.album-hero-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.album-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #000;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.album-action-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+.album-action-btn:hover { background: var(--accent-dim); transform: scale(1.03); }
+.album-action-btn:active { transform: scale(0.97); }
+
+.album-action-btn.secondary {
+  background: var(--bg-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.album-action-btn.secondary:hover { background: var(--bg-4); border-color: var(--accent); color: var(--accent); }
+
+/* ══════════════════════════════════════════════════
+   IMPORT PROGRESS PANEL
+   ══════════════════════════════════════════════════ */
+.import-panel {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  animation: slideIn 0.3s ease both;
+}
+
+.import-panel[hidden] { display: none; }
+
+.import-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.import-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.import-panel-count {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Global progress bar */
+.import-global-bar {
+  height: 6px;
+  background: var(--bg-4);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.import-global-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dim));
+  border-radius: 99px;
+  width: 0%;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.import-global-pct {
+  font-size: 22px;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-align: right;
+  margin-bottom: 14px;
+  line-height: 1;
+}
+
+/* Per-file list */
+.import-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.import-file-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.import-file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.import-file-name {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.import-file-status {
+  font-size: 11px;
+  color: var(--text-3);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  min-width: 80px;
+  text-align: right;
+}
+
+.import-file-bar {
+  height: 3px;
+  background: var(--bg-4);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.import-file-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+/* ══════════════════════════════════════════════════
    DESKTOP
    ══════════════════════════════════════════════════ */
 @media (min-width: 640px) {
