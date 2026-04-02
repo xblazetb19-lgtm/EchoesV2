@@ -157,6 +157,7 @@
       <div id="albumsGridView">
         <div class="list-header">
           <span class="list-count" id="albumCount">— albums</span>
+          <span class="list-sort" style="font-size:11px;color:var(--text-3)">↕ Glisser pour réordonner</span>
         </div>
         <div class="album-grid" id="albumGrid"></div>
         <div class="empty-state" id="albumsEmpty" hidden>
@@ -322,6 +323,57 @@
         <button class="btn-submit" id="btnAlbumSubmit">
           <span id="btnAlbumLabel">Créer</span>
           <span class="btn-loader" id="btnAlbumLoader" hidden></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- MODAL RENAME ALBUM (NEW)                   -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalRenameAlbum" role="dialog" aria-modal="true" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Renommer l'album</h2>
+        <button class="modal-close" id="modalRenameAlbumClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <label class="field-label" for="inputRenameAlbum">Nouveau nom *</label>
+          <input type="text" id="inputRenameAlbum" class="field-input" placeholder="Nom de l'album" autocomplete="off" maxlength="100" />
+        </div>
+        <p class="field-error" id="formRenameError" hidden></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="btnRenameCancel">Annuler</button>
+        <button class="btn-submit" id="btnRenameSubmit">
+          <span id="btnRenameLabel">Renommer</span>
+          <span class="btn-loader" id="btnRenameLoader" hidden></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- MODAL CONFIRM DELETE ALBUM (NEW)           -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modalConfirmDelete" role="dialog" aria-modal="true" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" style="color:var(--danger)">Supprimer l'album</h2>
+        <button class="modal-close" id="modalConfirmDeleteClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:15px;color:var(--text-2);line-height:1.5">
+          Supprimer l'album <strong id="confirmDeleteAlbumName" style="color:var(--text)"></strong> ?<br/>
+          <span style="font-size:13px;color:var(--text-3);margin-top:6px;display:block">Les musiques ne seront pas supprimées, elles seront juste détachées de l'album.</span>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="btnConfirmDeleteCancel">Annuler</button>
+        <button class="btn-submit" id="btnConfirmDeleteSubmit" style="background:var(--danger)">
+          <span id="btnConfirmDeleteLabel">Supprimer</span>
+          <span class="btn-loader" id="btnConfirmDeleteLoader" hidden></span>
         </button>
       </div>
     </div>
