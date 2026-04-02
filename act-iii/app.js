@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════
-   ACT-III — app.js  v2.0
+   ACT-III — app.js  v2.1
    Albums · Playlists · Upload MP3/Cover · Real Audio
    Supabase Realtime · Mobile-first
+   + Album rename, delete, drag-to-reorder
    ═══════════════════════════════════════════════════ */
 
 'use strict';
@@ -12,33 +13,28 @@
 const SUPABASE_URL  = 'https://mbytanrqvqdimmpwmxng.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_IZAapYrvdnIlt6-8WZWgSw_dbR3KQOJ';
 
-// Create client (supabase-js v2 is loaded via CDN as window.supabase)
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* ─────────────────────────────────────────────────────
    📦  STATE
    ───────────────────────────────────────────────────── */
-let allSongs      = [];   // all songs from DB
-let allAlbums     = [];   // all albums from DB
-let allPlaylists  = [];   // all playlists
+let allSongs      = [];
+let allAlbums     = [];
+let allPlaylists  = [];
 
 let filteredSongs = [];
 let currentTab    = 'home';
 
-// Playback
-let currentQueue  = [];   // songs in current context
-let currentIndex  = -1;   // index in queue
+let currentQueue  = [];
+let currentIndex  = -1;
 let isPlaying     = false;
-
-// Submit guards
 let isSubmitting  = false;
-
-// Song being targeted for "add to playlist"
 let atpSongId     = null;
-
-// Currently viewed album / playlist
 let currentAlbumId    = null;
 let currentPlaylistId = null;
+
+// Album drag-to-reorder
+let dragSrcAlbumId = null;
 
 let searchDebounceTimer = null;
 let toastTimer          = null;
@@ -51,12 +47,10 @@ const audioEl = document.getElementById('audioEl');
 /* ─────────────────────────────────────────────────────
    🔗  DOM REFS
    ───────────────────────────────────────────────────── */
-// Tabs
 const tabBtns         = document.querySelectorAll('.tab-btn');
 const tabSections     = document.querySelectorAll('.tab-section');
 const searchWrapper   = document.getElementById('searchWrapper');
 
-// Home
 const songList        = document.getElementById('songList');
 const emptyState      = document.getElementById('emptyState');
 const noResults       = document.getElementById('noResults');
@@ -64,7 +58,6 @@ const songCount       = document.getElementById('songCount');
 const searchInput     = document.getElementById('searchInput');
 const searchClear     = document.getElementById('searchClear');
 
-// Albums
 const albumGrid           = document.getElementById('albumGrid');
 const albumCount          = document.getElementById('albumCount');
 const albumsEmpty         = document.getElementById('albumsEmpty');
@@ -80,7 +73,6 @@ const btnImportToAlbum    = document.getElementById('btnImportToAlbum');
 const btnAddExistingToAlbum = document.getElementById('btnAddExistingToAlbum');
 const bulkMp3Input        = document.getElementById('bulkMp3Input');
 
-// Import progress panel
 const importPanel      = document.getElementById('importPanel');
 const importPanelTitle = document.getElementById('importPanelTitle');
 const importPanelCount = document.getElementById('importPanelCount');
@@ -88,7 +80,6 @@ const importGlobalFill = document.getElementById('importGlobalFill');
 const importGlobalPct  = document.getElementById('importGlobalPct');
 const importFileList   = document.getElementById('importFileList');
 
-// Modal Add Existing To Album
 const modalAddExisting      = document.getElementById('modalAddExisting');
 const modalAddExistingClose = document.getElementById('modalAddExistingClose');
 const addExistingAlbumName  = document.getElementById('addExistingAlbumName');
@@ -96,7 +87,6 @@ const existingSongSearch    = document.getElementById('existingSongSearch');
 const existingSongList      = document.getElementById('existingSongList');
 const existingSongEmpty     = document.getElementById('existingSongEmpty');
 
-// Playlists
 const playlistList      = document.getElementById('playlistList');
 const playlistCount     = document.getElementById('playlistCount');
 const playlistsEmpty    = document.getElementById('playlistsEmpty');
@@ -108,14 +98,12 @@ const playlistSongList  = document.getElementById('playlistSongList');
 const playlistEmptyState= document.getElementById('playlistEmptyState');
 const backFromPlaylist  = document.getElementById('backFromPlaylist');
 
-// FAB
 const fabBtn      = document.getElementById('fabBtn');
 const fabMenu     = document.getElementById('fabMenu');
 const fabAddSong  = document.getElementById('fabAddSong');
 const fabAddAlbum = document.getElementById('fabAddAlbum');
 const fabAddPlaylist = document.getElementById('fabAddPlaylist');
 
-// Modal Song
 const modalSong       = document.getElementById('modalSong');
 const modalSongClose  = document.getElementById('modalSongClose');
 const btnSongCancel   = document.getElementById('btnSongCancel');
@@ -133,7 +121,6 @@ const coverPreview    = document.getElementById('coverPreview');
 const inputAlbumSel   = document.getElementById('inputAlbum');
 const formSongError   = document.getElementById('formSongError');
 
-// Modal Album
 const modalAlbum       = document.getElementById('modalAlbum');
 const modalAlbumClose  = document.getElementById('modalAlbumClose');
 const btnAlbumCancel   = document.getElementById('btnAlbumCancel');
@@ -147,7 +134,6 @@ const albumCoverPreview= document.getElementById('albumCoverPreview');
 const albumCoverWrapper= document.getElementById('albumCoverWrapper');
 const formAlbumError   = document.getElementById('formAlbumError');
 
-// Modal Playlist
 const modalPlaylist      = document.getElementById('modalPlaylist');
 const modalPlaylistClose = document.getElementById('modalPlaylistClose');
 const btnPlaylistCancel  = document.getElementById('btnPlaylistCancel');
@@ -157,14 +143,12 @@ const btnPlaylistLoader  = document.getElementById('btnPlaylistLoader');
 const inputPlaylistName  = document.getElementById('inputPlaylistName');
 const formPlaylistError  = document.getElementById('formPlaylistError');
 
-// Modal Add to Playlist
 const modalATP      = document.getElementById('modalAddToPlaylist');
 const modalATPClose = document.getElementById('modalATPClose');
 const atpSongName   = document.getElementById('atpSongName');
 const playlistPickList = document.getElementById('playlistPickList');
 const atpEmpty      = document.getElementById('atpEmpty');
 
-// Player
 const player         = document.getElementById('player');
 const playerCover    = document.getElementById('playerCover');
 const playerCoverImg = document.getElementById('playerCoverImg');
@@ -182,6 +166,31 @@ const totalTimeEl    = document.getElementById('totalTime');
 const liveIndicator  = document.getElementById('liveIndicator');
 const toast          = document.getElementById('toast');
 
+// Album actions (new)
+const btnAlbumOptions    = document.getElementById('btnAlbumOptions');
+const albumOptionsMenu   = document.getElementById('albumOptionsMenu');
+const btnRenameAlbum     = document.getElementById('btnRenameAlbum');
+const btnDeleteAlbum     = document.getElementById('btnDeleteAlbum');
+
+// Modal Rename Album (new)
+const modalRenameAlbum      = document.getElementById('modalRenameAlbum');
+const modalRenameAlbumClose = document.getElementById('modalRenameAlbumClose');
+const btnRenameCancel       = document.getElementById('btnRenameCancel');
+const btnRenameSubmit       = document.getElementById('btnRenameSubmit');
+const btnRenameLabel        = document.getElementById('btnRenameLabel');
+const btnRenameLoader       = document.getElementById('btnRenameLoader');
+const inputRenameAlbum      = document.getElementById('inputRenameAlbum');
+const formRenameError       = document.getElementById('formRenameError');
+
+// Modal Confirm Delete (new)
+const modalConfirmDelete      = document.getElementById('modalConfirmDelete');
+const modalConfirmDeleteClose = document.getElementById('modalConfirmDeleteClose');
+const confirmDeleteAlbumName  = document.getElementById('confirmDeleteAlbumName');
+const btnConfirmDeleteCancel  = document.getElementById('btnConfirmDeleteCancel');
+const btnConfirmDeleteSubmit  = document.getElementById('btnConfirmDeleteSubmit');
+const btnConfirmDeleteLabel   = document.getElementById('btnConfirmDeleteLabel');
+const btnConfirmDeleteLoader  = document.getElementById('btnConfirmDeleteLoader');
+
 /* ═══════════════════════════════════════════════════
    🚀  INIT
    ═══════════════════════════════════════════════════ */
@@ -189,8 +198,6 @@ async function init() {
   registerServiceWorker();
   bindEvents();
   setupAudio();
-
-  // Load all data in parallel
   await Promise.all([loadAlbums(), loadPlaylists()]);
   await loadSongs();
   setupRealtime();
@@ -223,6 +230,7 @@ async function loadAlbums() {
     const { data, error } = await db
       .from('albums')
       .select('*')
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false });
     if (error) throw error;
     allAlbums = data || [];
@@ -252,7 +260,6 @@ async function loadPlaylists() {
    ═══════════════════════════════════════════════════ */
 function renderSongs(list, container, opts = {}) {
   container.innerHTML = '';
-
   const { showEmpty, useHome } = opts;
 
   if (useHome) {
@@ -274,7 +281,6 @@ function renderSongs(list, container, opts = {}) {
 }
 
 function getCoverUrl(song) {
-  // Priority: song's own cover → album cover → null
   if (song.cover_url) return song.cover_url;
   if (song.albums && song.albums.cover_url) return song.albums.cover_url;
   if (song.album_id) {
@@ -319,13 +325,11 @@ function createSongElement(song, index, queue) {
     </button>
   `;
 
-  // Play on click (not on button)
   li.addEventListener('click', (e) => {
     if (e.target.closest('.btn-more')) return;
     playSongInQueue(queue, index);
   });
 
-  // Options menu → add to playlist
   li.querySelector('.btn-more').addEventListener('click', (e) => {
     e.stopPropagation();
     openAddToPlaylist(song);
@@ -335,31 +339,309 @@ function createSongElement(song, index, queue) {
 }
 
 /* ═══════════════════════════════════════════════════
-   🎨  RENDER — ALBUMS
+   🎨  RENDER — ALBUMS (with drag-to-reorder)
    ═══════════════════════════════════════════════════ */
 function renderAlbumsGrid() {
   albumGrid.innerHTML = '';
   updateCount(albumCount, allAlbums.length, 'album');
   albumsEmpty.hidden = allAlbums.length > 0;
 
-  allAlbums.forEach(album => {
+  allAlbums.forEach((album, index) => {
     const card = document.createElement('div');
     card.classList.add('album-card');
     card.setAttribute('data-id', album.id);
+    card.setAttribute('draggable', 'true');
+    card.style.animationDelay = `${Math.min(index * 60, 400)}ms`;
+
     card.innerHTML = `
       <div class="album-card-cover">
         ${album.cover_url
           ? `<img src="${escapeHtml(album.cover_url)}" alt="${escapeHtml(album.name)}" />`
           : `<div class="album-card-placeholder">◉</div>`
         }
+        <div class="album-card-drag-handle" title="Glisser pour réordonner">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+            <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+          </svg>
+        </div>
       </div>
-      <p class="album-card-name">${escapeHtml(album.name)}</p>
+      <div class="album-card-footer">
+        <p class="album-card-name">${escapeHtml(album.name)}</p>
+        <button class="album-card-menu-btn" data-id="${album.id}" aria-label="Options de l'album" title="Options">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+            <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+          </svg>
+        </button>
+      </div>
     `;
-    card.addEventListener('click', () => openAlbumDetail(album));
+
+    // Click to open (not on menu btn or drag handle)
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.album-card-menu-btn')) return;
+      openAlbumDetail(album);
+    });
+
+    // Options menu
+    card.querySelector('.album-card-menu-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openAlbumCardMenu(album, e.currentTarget);
+    });
+
+    // Drag events
+    card.addEventListener('dragstart', onAlbumDragStart);
+    card.addEventListener('dragover',  onAlbumDragOver);
+    card.addEventListener('dragleave', onAlbumDragLeave);
+    card.addEventListener('drop',      onAlbumDrop);
+    card.addEventListener('dragend',   onAlbumDragEnd);
+
     albumGrid.appendChild(card);
   });
 }
 
+/* ─── Album card context menu (inline, not a modal) ─── */
+let activeAlbumCardMenu = null;
+
+function openAlbumCardMenu(album, triggerEl) {
+  // Close any existing
+  closeAlbumCardMenu();
+
+  const menu = document.createElement('div');
+  menu.classList.add('album-card-context-menu');
+  menu.innerHTML = `
+    <button class="album-ctx-item" data-action="rename">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Renommer
+    </button>
+    <button class="album-ctx-item danger" data-action="delete">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      Supprimer
+    </button>
+  `;
+
+  menu.querySelector('[data-action="rename"]').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAlbumCardMenu();
+    openRenameAlbumModal(album);
+  });
+
+  menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAlbumCardMenu();
+    openConfirmDeleteModal(album);
+  });
+
+  // Position near trigger
+  const rect = triggerEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top  = `${rect.bottom + 6}px`;
+  menu.style.right = `${window.innerWidth - rect.right}px`;
+
+  document.body.appendChild(menu);
+  activeAlbumCardMenu = menu;
+
+  // Animate in
+  requestAnimationFrame(() => menu.classList.add('visible'));
+}
+
+function closeAlbumCardMenu() {
+  if (activeAlbumCardMenu) {
+    activeAlbumCardMenu.remove();
+    activeAlbumCardMenu = null;
+  }
+}
+
+/* ─── Drag & Drop reorder ─── */
+function onAlbumDragStart(e) {
+  dragSrcAlbumId = this.dataset.id;
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSrcAlbumId);
+}
+
+function onAlbumDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (this.dataset.id !== dragSrcAlbumId) {
+    this.classList.add('drag-over');
+  }
+}
+
+function onAlbumDragLeave() {
+  this.classList.remove('drag-over');
+}
+
+async function onAlbumDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+
+  const targetId = this.dataset.id;
+  if (!dragSrcAlbumId || dragSrcAlbumId === targetId) return;
+
+  // Reorder in local array
+  const srcIdx = allAlbums.findIndex(a => String(a.id) === String(dragSrcAlbumId));
+  const tgtIdx = allAlbums.findIndex(a => String(a.id) === String(targetId));
+  if (srcIdx === -1 || tgtIdx === -1) return;
+
+  const [moved] = allAlbums.splice(srcIdx, 1);
+  allAlbums.splice(tgtIdx, 0, moved);
+
+  renderAlbumsGrid();
+  populateAlbumSelect();
+
+  // Persist order to DB (update sort_order column if it exists, graceful fail otherwise)
+  try {
+    const updates = allAlbums.map((album, idx) =>
+      db.from('albums').update({ sort_order: idx }).eq('id', album.id)
+    );
+    await Promise.all(updates);
+  } catch (err) {
+    console.warn('[Act-III] sort_order update failed (column may not exist):', err);
+  }
+}
+
+function onAlbumDragEnd() {
+  document.querySelectorAll('.album-card').forEach(c => {
+    c.classList.remove('dragging', 'drag-over');
+  });
+  dragSrcAlbumId = null;
+}
+
+/* ─── Rename Album Modal ─── */
+function openRenameAlbumModal(album) {
+  currentAlbumId = album.id;
+  inputRenameAlbum.value = album.name;
+  clearError(formRenameError);
+  inputRenameAlbum.classList.remove('error');
+  modalRenameAlbum.hidden = false;
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => {
+    inputRenameAlbum.focus();
+    inputRenameAlbum.select();
+  }, 350);
+}
+
+function closeRenameAlbumModal() {
+  modalRenameAlbum.hidden = true;
+  document.body.style.overflow = '';
+}
+
+async function submitRenameAlbum() {
+  if (isSubmitting) return;
+  const newName = inputRenameAlbum.value.trim();
+  clearError(formRenameError);
+
+  if (!newName) {
+    inputRenameAlbum.classList.add('error');
+    showError(formRenameError, 'Le nom ne peut pas être vide.');
+    return;
+  }
+
+  isSubmitting = true;
+  setLoading(btnRenameSubmit, btnRenameLabel, btnRenameLoader, true, 'Renommage…');
+
+  try {
+    const { error } = await db
+      .from('albums')
+      .update({ name: newName })
+      .eq('id', currentAlbumId);
+    if (error) throw error;
+
+    // Update local state
+    const album = allAlbums.find(a => a.id === currentAlbumId);
+    if (album) album.name = newName;
+
+    // Update songs that reference this album
+    allSongs.forEach(s => {
+      if (s.albums && s.albums.id === currentAlbumId) s.albums.name = newName;
+    });
+
+    closeRenameAlbumModal();
+    showToast(`Album renommé en "${newName}" !`);
+
+    renderAlbumsGrid();
+    populateAlbumSelect();
+
+    // If we're in the detail view of this album, update hero title
+    if (albumDetailView && !albumDetailView.hidden) {
+      albumHeroName.textContent = newName;
+    }
+
+  } catch (err) {
+    console.error('[Act-III] renameAlbum error:', err);
+    showError(formRenameError, 'Erreur lors du renommage.');
+  } finally {
+    isSubmitting = false;
+    setLoading(btnRenameSubmit, btnRenameLabel, btnRenameLoader, false, 'Renommer');
+  }
+}
+
+/* ─── Delete Album Modal ─── */
+function openConfirmDeleteModal(album) {
+  currentAlbumId = album.id;
+  confirmDeleteAlbumName.textContent = `"${album.name}"`;
+  modalConfirmDelete.hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeConfirmDeleteModal() {
+  modalConfirmDelete.hidden = true;
+  document.body.style.overflow = '';
+}
+
+async function submitDeleteAlbum() {
+  if (isSubmitting) return;
+  isSubmitting = true;
+  setLoading(btnConfirmDeleteSubmit, btnConfirmDeleteLabel, btnConfirmDeleteLoader, true, 'Suppression…');
+
+  try {
+    // Detach songs from album first
+    await db.from('songs').update({ album_id: null }).eq('album_id', currentAlbumId);
+
+    // Delete album
+    const { error } = await db.from('albums').delete().eq('id', currentAlbumId);
+    if (error) throw error;
+
+    // Update local state
+    allAlbums = allAlbums.filter(a => a.id !== currentAlbumId);
+    allSongs.forEach(s => {
+      if (s.album_id === currentAlbumId) {
+        s.album_id = null;
+        s.albums = null;
+      }
+    });
+    filteredSongs = applySearch(allSongs, searchInput.value);
+
+    closeConfirmDeleteModal();
+    showToast('Album supprimé.');
+
+    renderAlbumsGrid();
+    populateAlbumSelect();
+    renderSongs(filteredSongs, songList, { showEmpty: true, useHome: true });
+    updateCount(songCount, allSongs.length, 'titre');
+
+    // Go back to grid if we were in the detail of this album
+    if (!albumDetailView.hidden) {
+      albumDetailView.hidden = true;
+      albumsGridView.hidden  = false;
+      importPanel.hidden     = true;
+      currentAlbumId = null;
+    }
+
+  } catch (err) {
+    console.error('[Act-III] deleteAlbum error:', err);
+    showToast('Erreur lors de la suppression.');
+  } finally {
+    isSubmitting = false;
+    setLoading(btnConfirmDeleteSubmit, btnConfirmDeleteLabel, btnConfirmDeleteLoader, false, 'Supprimer');
+    closeConfirmDeleteModal();
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   🎨  ALBUM DETAIL
+   ═══════════════════════════════════════════════════ */
 async function openAlbumDetail(album) {
   currentAlbumId = album.id;
 
@@ -374,7 +656,6 @@ async function openAlbumDetail(album) {
   await refreshAlbumSongs();
 }
 
-/* Recharge la liste de musiques de l'album courant */
 async function refreshAlbumSongs() {
   showSkeletons(albumSongList, 3);
   try {
@@ -412,7 +693,6 @@ async function importMp3sToAlbum(files) {
   const total = files.length;
   let done = 0;
 
-  // Show import panel
   importPanel.hidden = false;
   importPanelTitle.textContent = `Importation en cours…`;
   importPanelCount.textContent = `0 / ${total}`;
@@ -420,10 +700,6 @@ async function importMp3sToAlbum(files) {
   importGlobalPct.textContent  = '0%';
   importFileList.innerHTML = '';
 
-  // Get album info for cover fallback
-  const album = allAlbums.find(a => a.id === currentAlbumId);
-
-  // Create a row per file
   const fileRows = [];
   Array.from(files).forEach((file, i) => {
     const row = document.createElement('div');
@@ -442,7 +718,6 @@ async function importMp3sToAlbum(files) {
     fileRows.push({ file, nameClean, index: i });
   });
 
-  // Process sequentially
   for (const { file, nameClean, index } of fileRows) {
     const statusEl = document.getElementById(`importStatus_${index}`);
     const fillEl   = document.getElementById(`importFill_${index}`);
@@ -451,10 +726,7 @@ async function importMp3sToAlbum(files) {
     fillEl.style.width   = '5%';
 
     try {
-      // Upload MP3
       const mp3Path = `${Date.now()}-${index}-${sanitizeFilename(file.name)}`;
-
-      // XHR pour vraie progression
       const audioUrl = await uploadWithProgress(
         `${SUPABASE_URL}/storage/v1/object/songs/${mp3Path}`,
         file,
@@ -468,7 +740,6 @@ async function importMp3sToAlbum(files) {
       fillEl.style.width = '90%';
       statusEl.textContent = 'Enregistrement…';
 
-      // Parse title / artist depuis le nom du fichier (format "Artiste - Titre" ou juste "Titre")
       let title  = nameClean;
       let artist = 'Inconnu';
       const sep = nameClean.indexOf(' - ');
@@ -477,16 +748,9 @@ async function importMp3sToAlbum(files) {
         title  = nameClean.slice(sep + 3).trim();
       }
 
-      // Insert into DB
       const { data: songData, error: dbErr } = await db
         .from('songs')
-        .insert([{
-          title,
-          artist,
-          audio_url: audioUrl,
-          cover_url: null,       // utilisera la cover de l'album
-          album_id:  currentAlbumId
-        }])
+        .insert([{ title, artist, audio_url: audioUrl, cover_url: null, album_id: currentAlbumId }])
         .select('*, albums(id, name, cover_url)')
         .single();
 
@@ -497,11 +761,9 @@ async function importMp3sToAlbum(files) {
       statusEl.textContent = '✓ OK';
       statusEl.style.color = 'var(--accent)';
 
-      // Add to local allSongs
       if (!allSongs.find(s => s.id === songData.id)) {
         allSongs.unshift(songData);
       }
-
     } catch (err) {
       console.error(`[Act-III] import error for ${file.name}:`, err);
       fillEl.style.background = 'var(--danger)';
@@ -516,21 +778,17 @@ async function importMp3sToAlbum(files) {
     importPanelCount.textContent = `${done} / ${total}`;
   }
 
-  // Finished
   importPanelTitle.textContent = done === total ? 'Importation terminée ✓' : `Importation partielle (${done}/${total})`;
   importGlobalFill.style.background = 'var(--accent)';
 
-  // Refresh list & home
   filteredSongs = applySearch(allSongs, searchInput.value);
   renderSongs(filteredSongs, songList, { showEmpty: true, useHome: true });
   updateCount(songCount, allSongs.length, 'titre');
   await refreshAlbumSongs();
 
-  // Auto-hide panel after 3s
   setTimeout(() => { importPanel.hidden = true; }, 3500);
 }
 
-/* Upload fichier via XHR pour avoir la progression réelle */
 function uploadWithProgress(url, file, mimeType, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -541,14 +799,12 @@ function uploadWithProgress(url, file, mimeType, onProgress) {
 
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable) {
-        const pct = Math.round((e.loaded / e.total) * 100);
-        onProgress(Math.min(pct, 95)); // reserve 5% for DB insert
+        onProgress(Math.min(Math.round((e.loaded / e.total) * 100), 95));
       }
     });
 
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        // Build public URL
         const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/songs/${url.split('/songs/')[1]}`;
         resolve(publicUrl);
       } else {
@@ -569,7 +825,6 @@ function openAddExistingModal() {
   const album = allAlbums.find(a => a.id === currentAlbumId);
   addExistingAlbumName.textContent = album ? `Album : "${album.name}"` : '';
   existingSongSearch.value = '';
-
   renderExistingSongsList('');
   modalAddExisting.hidden = false;
   document.body.style.overflow = 'hidden';
@@ -578,7 +833,6 @@ function openAddExistingModal() {
 
 function renderExistingSongsList(query) {
   existingSongList.innerHTML = '';
-  // Songs not yet in this album
   let candidates = allSongs.filter(s => s.album_id !== currentAlbumId);
   if (query) {
     const q = query.toLowerCase();
@@ -586,9 +840,7 @@ function renderExistingSongsList(query) {
       s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q)
     );
   }
-
   existingSongEmpty.hidden = candidates.length > 0;
-
   candidates.forEach(song => {
     const btn = document.createElement('button');
     btn.classList.add('playlist-pick-btn');
@@ -610,25 +862,19 @@ function renderExistingSongsList(query) {
 
 async function assignSongToAlbum(song) {
   try {
-    const { error } = await db
-      .from('songs')
-      .update({ album_id: currentAlbumId })
-      .eq('id', song.id);
+    const { error } = await db.from('songs').update({ album_id: currentAlbumId }).eq('id', song.id);
     if (error) throw error;
 
-    // Update local state
     const local = allSongs.find(s => s.id === song.id);
     if (local) {
       local.album_id = currentAlbumId;
-      const album = allAlbums.find(a => a.id === currentAlbumId);
-      local.albums = album || null;
+      local.albums = allAlbums.find(a => a.id === currentAlbumId) || null;
     }
 
     showToast(`"${song.title}" ajouté à l'album !`);
     modalAddExisting.hidden = true;
     document.body.style.overflow = '';
 
-    // Refresh views
     filteredSongs = applySearch(allSongs, searchInput.value);
     renderSongs(filteredSongs, songList, { showEmpty: true, useHome: true });
     await refreshAlbumSongs();
@@ -667,7 +913,6 @@ function renderPlaylistsList() {
 async function openPlaylistDetail(playlist) {
   currentPlaylistId = playlist.id;
   playlistHeroName.textContent = playlist.name;
-
   playlistsListView.hidden   = true;
   playlistDetailView.hidden  = false;
 
@@ -708,7 +953,6 @@ async function addSong() {
   const cover  = inputCover.files[0] || null;
   const albumId= inputAlbumSel.value ? parseInt(inputAlbumSel.value) : null;
 
-  // Validate
   let valid = true;
   clearError(formSongError);
   if (!title)  { inputTitle.classList.add('error');  valid = false; }
@@ -720,40 +964,24 @@ async function addSong() {
   setLoading(btnSongSubmit, btnSongLabel, btnSongLoader, true, 'Upload…');
 
   try {
-    // 1. Upload MP3
     const mp3Path = `${Date.now()}-${sanitizeFilename(mp3.name)}`;
-    const { error: mp3Err } = await db.storage
-      .from('songs')
-      .upload(mp3Path, mp3, { contentType: 'audio/mpeg', upsert: false });
+    const { error: mp3Err } = await db.storage.from('songs').upload(mp3Path, mp3, { contentType: 'audio/mpeg', upsert: false });
     if (mp3Err) throw mp3Err;
-
     const { data: mp3Data } = db.storage.from('songs').getPublicUrl(mp3Path);
     const audioUrl = mp3Data.publicUrl;
 
-    // 2. Upload cover (if provided)
     let coverUrl = null;
     if (cover) {
       const coverPath = `${Date.now()}-${sanitizeFilename(cover.name)}`;
-      const { error: covErr } = await db.storage
-        .from('covers')
-        .upload(coverPath, cover, { contentType: cover.type, upsert: false });
+      const { error: covErr } = await db.storage.from('covers').upload(coverPath, cover, { contentType: cover.type, upsert: false });
       if (covErr) throw covErr;
       const { data: covData } = db.storage.from('covers').getPublicUrl(coverPath);
       coverUrl = covData.publicUrl;
     }
 
-    // 3. Insert into songs table
-    const payload = {
-      title,
-      artist,
-      audio_url: audioUrl,
-      cover_url: coverUrl,
-      album_id:  albumId
-    };
-
     const { data: songData, error: dbErr } = await db
       .from('songs')
-      .insert([payload])
+      .insert([{ title, artist, audio_url: audioUrl, cover_url: coverUrl, album_id: albumId }])
       .select('*, albums(id, name, cover_url)')
       .single();
     if (dbErr) throw dbErr;
@@ -761,14 +989,12 @@ async function addSong() {
     closeSongModal();
     showToast(`♪ "${title}" ajouté !`);
 
-    // Optimistic local insert
     if (!allSongs.find(s => s.id === songData.id)) {
       allSongs.unshift(songData);
       filteredSongs = applySearch(allSongs, searchInput.value);
       renderSongs(filteredSongs, songList, { showEmpty: true, useHome: true });
       updateCount(songCount, allSongs.length, 'titre');
     }
-
   } catch (err) {
     console.error('[Act-III] addSong error:', err);
     showError(formSongError, 'Erreur lors de l\'upload. Vérifiez votre connexion.');
@@ -797,31 +1023,24 @@ async function createAlbum() {
   setLoading(btnAlbumSubmit, btnAlbumLabel, btnAlbumLoader, true, 'Création…');
 
   try {
-    // Upload cover
     const coverPath = `${Date.now()}-${sanitizeFilename(cover.name)}`;
-    const { error: covErr } = await db.storage
-      .from('covers')
-      .upload(coverPath, cover, { contentType: cover.type, upsert: false });
+    const { error: covErr } = await db.storage.from('covers').upload(coverPath, cover, { contentType: cover.type, upsert: false });
     if (covErr) throw covErr;
-
     const { data: covData } = db.storage.from('covers').getPublicUrl(coverPath);
     const coverUrl = covData.publicUrl;
 
-    // Insert album
     const { data: albumData, error: dbErr } = await db
       .from('albums')
-      .insert([{ name, cover_url: coverUrl }])
+      .insert([{ name, cover_url: coverUrl, sort_order: allAlbums.length }])
       .select()
       .single();
     if (dbErr) throw dbErr;
 
     closeAlbumModal();
     showToast(`◉ Album "${name}" créé !`);
-
     allAlbums.unshift(albumData);
     renderAlbumsGrid();
     populateAlbumSelect();
-
   } catch (err) {
     console.error('[Act-III] createAlbum error:', err);
     showError(formAlbumError, 'Erreur lors de la création.');
@@ -849,18 +1068,13 @@ async function createPlaylist() {
   setLoading(btnPlaylistSubmit, btnPlaylistLabel, btnPlaylistLoader, true, 'Création…');
 
   try {
-    const { data, error } = await db
-      .from('playlists')
-      .insert([{ name }])
-      .select()
-      .single();
+    const { data, error } = await db.from('playlists').insert([{ name }]).select().single();
     if (error) throw error;
 
     closePlaylistModal();
     showToast(`≡ Playlist "${name}" créée !`);
     allPlaylists.unshift(data);
     renderPlaylistsList();
-
   } catch (err) {
     console.error('[Act-III] createPlaylist error:', err);
     showError(formPlaylistError, 'Erreur lors de la création.');
@@ -876,7 +1090,6 @@ async function createPlaylist() {
 function openAddToPlaylist(song) {
   atpSongId = song.id;
   atpSongName.textContent = `"${song.title}"`;
-
   playlistPickList.innerHTML = '';
   atpEmpty.hidden = allPlaylists.length > 0;
 
@@ -894,7 +1107,6 @@ function openAddToPlaylist(song) {
 
 async function addSongToPlaylist(playlist) {
   try {
-    // Check for duplicate
     const { data: existing } = await db
       .from('playlist_songs')
       .select('id')
@@ -908,9 +1120,7 @@ async function addSongToPlaylist(playlist) {
       return;
     }
 
-    const { error } = await db
-      .from('playlist_songs')
-      .insert([{ playlist_id: playlist.id, song_id: atpSongId }]);
+    const { error } = await db.from('playlist_songs').insert([{ playlist_id: playlist.id, song_id: atpSongId }]);
     if (error) throw error;
 
     showToast(`Ajouté à "${playlist.name}" !`);
@@ -925,15 +1135,11 @@ async function addSongToPlaylist(playlist) {
    🔄  REALTIME
    ═══════════════════════════════════════════════════ */
 function setupRealtime() {
-  // Songs
   db.channel('songs-changes')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'songs' }, (payload) => {
       const song = payload.new;
       if (!allSongs.find(s => s.id === song.id)) {
-        // Attach album info if available
-        if (song.album_id) {
-          song.albums = allAlbums.find(a => a.id === song.album_id) || null;
-        }
+        if (song.album_id) song.albums = allAlbums.find(a => a.id === song.album_id) || null;
         allSongs.unshift(song);
         filteredSongs = applySearch(allSongs, searchInput.value);
         renderSongs(filteredSongs, songList, { showEmpty: true, useHome: true });
@@ -945,20 +1151,28 @@ function setupRealtime() {
       liveIndicator.classList.toggle('active', status === 'SUBSCRIBED');
     });
 
-  // Albums
   db.channel('albums-changes')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'albums' }, (payload) => {
-      const album = payload.new;
-      if (!allAlbums.find(a => a.id === album.id)) {
-        allAlbums.unshift(album);
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'albums' }, async (payload) => {
+      if (payload.eventType === 'INSERT') {
+        if (!allAlbums.find(a => a.id === payload.new.id)) {
+          allAlbums.unshift(payload.new);
+          renderAlbumsGrid();
+          populateAlbumSelect();
+          showToast('◉ Nouvel album ajouté !');
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = allAlbums.findIndex(a => a.id === payload.new.id);
+        if (idx !== -1) allAlbums[idx] = { ...allAlbums[idx], ...payload.new };
         renderAlbumsGrid();
         populateAlbumSelect();
-        showToast('◉ Nouvel album ajouté !');
+      } else if (payload.eventType === 'DELETE') {
+        allAlbums = allAlbums.filter(a => a.id !== payload.old.id);
+        renderAlbumsGrid();
+        populateAlbumSelect();
       }
     })
     .subscribe();
 
-  // Playlists
   db.channel('playlists-changes')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'playlists' }, (payload) => {
       const pl = payload.new;
@@ -991,7 +1205,6 @@ function setupAudio() {
     player.classList.remove('playing');
   });
 
-  // Progress bar scrubbing
   progressBar.addEventListener('click', (e) => {
     if (!audioEl.duration) return;
     const rect = progressBar.getBoundingClientRect();
@@ -1008,22 +1221,15 @@ function playSongInQueue(queue, index) {
 
 function loadAndPlay(song) {
   if (!song) return;
-
-  // Check if it has an audio URL
-  if (!song.audio_url) {
-    showToast('Pas de fichier audio pour ce titre');
-    return;
-  }
+  if (!song.audio_url) { showToast('Pas de fichier audio pour ce titre'); return; }
 
   audioEl.src = song.audio_url;
   audioEl.load();
   audioEl.play().catch(err => console.warn('[Act-III] play error:', err));
 
-  // Update player UI
   playerTitle.textContent  = song.title;
   playerArtist.textContent = song.artist;
 
-  // Cover in player
   const coverUrl = getCoverUrl(song);
   if (coverUrl) {
     playerCoverImg.src    = coverUrl;
@@ -1034,17 +1240,13 @@ function loadAndPlay(song) {
     playerDiscInner.hidden = false;
   }
 
-  // Highlight in lists
   updatePlayingHighlights();
 }
 
 function togglePlayPause() {
   if (!audioEl.src) return;
-  if (isPlaying) {
-    audioEl.pause();
-  } else {
-    audioEl.play().catch(err => console.warn('[Act-III] play error:', err));
-  }
+  if (isPlaying) audioEl.pause();
+  else audioEl.play().catch(err => console.warn('[Act-III] play error:', err));
 }
 
 function playNext() {
@@ -1055,10 +1257,7 @@ function playNext() {
 
 function playPrev() {
   if (currentQueue.length === 0) return;
-  if (audioEl.currentTime > 3) {
-    audioEl.currentTime = 0;
-    return;
-  }
+  if (audioEl.currentTime > 3) { audioEl.currentTime = 0; return; }
   currentIndex = (currentIndex - 1 + currentQueue.length) % currentQueue.length;
   loadAndPlay(currentQueue[currentIndex]);
 }
@@ -1071,10 +1270,8 @@ function onTimeUpdate() {
 }
 
 function updatePlayBtn() {
-  const iconPlay  = playBtn.querySelector('.icon-play');
-  const iconPause = playBtn.querySelector('.icon-pause');
-  iconPlay.style.display  = isPlaying ? 'none'  : 'block';
-  iconPause.style.display = isPlaying ? 'block' : 'none';
+  playBtn.querySelector('.icon-play').style.display  = isPlaying ? 'none'  : 'block';
+  playBtn.querySelector('.icon-pause').style.display = isPlaying ? 'block' : 'none';
 }
 
 function updatePlayingHighlights() {
@@ -1105,10 +1302,7 @@ function handleSearch() {
 function applySearch(songs, query) {
   if (!query) return [...songs];
   const q = query.toLowerCase().trim();
-  return songs.filter(s =>
-    s.title.toLowerCase().includes(q) ||
-    s.artist.toLowerCase().includes(q)
-  );
+  return songs.filter(s => s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q));
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1116,23 +1310,13 @@ function applySearch(songs, query) {
    ═══════════════════════════════════════════════════ */
 function switchTab(tabId) {
   currentTab = tabId;
-
   tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
   tabSections.forEach(sec => sec.classList.toggle('active', sec.id === `tab-${tabId}`));
-
-  // Show search only on home
   searchWrapper.hidden = tabId !== 'home';
-
-  // Update FAB label / options based on tab
-  updateFabForTab(tabId);
-}
-
-function updateFabForTab(tabId) {
-  // All FAB items always visible; we just use the menu
 }
 
 /* ═══════════════════════════════════════════════════
-   🧮  HELPERS — SELECTS / COUNTS
+   🧮  HELPERS
    ═══════════════════════════════════════════════════ */
 function populateAlbumSelect() {
   inputAlbumSel.innerHTML = '<option value="">— Aucun album —</option>';
@@ -1251,7 +1435,7 @@ function showToast(message, duration = 2500) {
   clearTimeout(toastTimer);
   toast.textContent = message;
   toast.hidden = false;
-  toast.offsetHeight; // reflow
+  toast.offsetHeight;
   toast.classList.add('show');
   toastTimer = setTimeout(() => {
     toast.classList.remove('show');
@@ -1335,10 +1519,13 @@ function bindEvents() {
   fabAddAlbum.addEventListener('click', openAlbumModal);
   fabAddPlaylist.addEventListener('click', openPlaylistModal);
 
-  // Close FAB menu on outside click
   document.addEventListener('click', (e) => {
     if (!fabMenu.hidden && !fabBtn.contains(e.target) && !fabMenu.contains(e.target)) {
       closeFabMenu();
+    }
+    // Close album card menu on outside click
+    if (activeAlbumCardMenu && !activeAlbumCardMenu.contains(e.target)) {
+      closeAlbumCardMenu();
     }
   });
 
@@ -1359,10 +1546,7 @@ function bindEvents() {
     if (!f) { coverPreview.hidden = true; return; }
     coverLabel.textContent = f.name;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      coverPreview.src = e.target.result;
-      coverPreview.hidden = false;
-    };
+    reader.onload = (e) => { coverPreview.src = e.target.result; coverPreview.hidden = false; };
     reader.readAsDataURL(f);
   });
 
@@ -1378,10 +1562,7 @@ function bindEvents() {
     albumCoverLabel.textContent = f.name;
     albumCoverWrapper.classList.remove('error');
     const reader = new FileReader();
-    reader.onload = (e) => {
-      albumCoverPreview.src = e.target.result;
-      albumCoverPreview.hidden = false;
-    };
+    reader.onload = (e) => { albumCoverPreview.src = e.target.result; albumCoverPreview.hidden = false; };
     reader.readAsDataURL(f);
   });
 
@@ -1395,18 +1576,27 @@ function bindEvents() {
   modalATPClose.addEventListener('click', closeModalATP);
   modalATP.addEventListener('click', (e) => { if (e.target === modalATP) closeModalATP(); });
 
+  /* ── MODAL RENAME ALBUM ── */
+  modalRenameAlbumClose.addEventListener('click', closeRenameAlbumModal);
+  btnRenameCancel.addEventListener('click', closeRenameAlbumModal);
+  btnRenameSubmit.addEventListener('click', submitRenameAlbum);
+  modalRenameAlbum.addEventListener('click', (e) => { if (e.target === modalRenameAlbum) closeRenameAlbumModal(); });
+  inputRenameAlbum.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitRenameAlbum(); });
+
+  /* ── MODAL CONFIRM DELETE ── */
+  modalConfirmDeleteClose.addEventListener('click', closeConfirmDeleteModal);
+  btnConfirmDeleteCancel.addEventListener('click', closeConfirmDeleteModal);
+  btnConfirmDeleteSubmit.addEventListener('click', submitDeleteAlbum);
+  modalConfirmDelete.addEventListener('click', (e) => { if (e.target === modalConfirmDelete) closeConfirmDeleteModal(); });
+
   /* ── ALBUM DETAIL ACTIONS ── */
   btnImportToAlbum.addEventListener('click', () => {
-    bulkMp3Input.value = ''; // reset so same files can be re-selected
+    bulkMp3Input.value = '';
     bulkMp3Input.click();
   });
-
   bulkMp3Input.addEventListener('change', () => {
-    if (bulkMp3Input.files.length > 0) {
-      importMp3sToAlbum(bulkMp3Input.files);
-    }
+    if (bulkMp3Input.files.length > 0) importMp3sToAlbum(bulkMp3Input.files);
   });
-
   btnAddExistingToAlbum.addEventListener('click', openAddExistingModal);
 
   /* ── MODAL ADD EXISTING ── */
@@ -1415,10 +1605,7 @@ function bindEvents() {
     document.body.style.overflow = '';
   });
   modalAddExisting.addEventListener('click', (e) => {
-    if (e.target === modalAddExisting) {
-      modalAddExisting.hidden = true;
-      document.body.style.overflow = '';
-    }
+    if (e.target === modalAddExisting) { modalAddExisting.hidden = true; document.body.style.overflow = ''; }
   });
   existingSongSearch.addEventListener('input', () => {
     renderExistingSongsList(existingSongSearch.value.trim());
@@ -1445,7 +1632,10 @@ function bindEvents() {
   /* ── ESCAPE ── */
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (!modalSong.hidden) closeSongModal();
+    closeAlbumCardMenu();
+    if (!modalRenameAlbum.hidden) closeRenameAlbumModal();
+    else if (!modalConfirmDelete.hidden) closeConfirmDeleteModal();
+    else if (!modalSong.hidden) closeSongModal();
     else if (!modalAlbum.hidden) closeAlbumModal();
     else if (!modalPlaylist.hidden) closePlaylistModal();
     else if (!modalATP.hidden) closeModalATP();
